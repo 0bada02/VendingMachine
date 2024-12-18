@@ -29,8 +29,7 @@ public class Main {
 
                     switch (choice) {
                         case 1:
-                            if (vm.showItemsInMachine() != null)
-                                System.out.println(vm.showItemsInMachine());
+                            vm.showItemsInMachine();
                             break;
                         case 2:
                             vm.buyItem();
@@ -76,8 +75,7 @@ public class Main {
                             vm.fillingMachine();
                             break;
                         case 4:
-                            if (vm.showItemsInMachine() != null)
-                                System.out.println(vm.showItemsInMachine());
+                            vm.showItemsInMachine();
                             break;
                         case 5:
                             vm.showMoneysInMachine();

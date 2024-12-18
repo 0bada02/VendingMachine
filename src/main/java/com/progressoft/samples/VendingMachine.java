@@ -13,10 +13,6 @@ public class VendingMachine {
     private Scanner scanner = new Scanner(System.in);
 
     public VendingMachine() {
-        initializeMoney();
-    }
-
-    public void initializeMoney() {
         moneys.put(Money.OnePiaster.amount(), 0);
         moneys.put(Money.FivePiasters.amount(), 0);
         moneys.put(Money.TenPiasters.amount(), 0);
@@ -40,32 +36,50 @@ public class VendingMachine {
     }
 
     public boolean existItemById(int id) {
-        return items.stream().anyMatch(item -> item.getId() == id);
+        return items.stream().noneMatch(item -> item.getId() == id);
+    }
+
+    public int getMachineSize() {
+        int size = 0;
+        for (Item i : items)
+            size += i.getQuantity();
+
+        return size;
+    }
+
+    public void checkQuantityAddition(Item item) {
+        int size = getMachineSize();
+
+        if (size == maxSizeMachine) {
+            System.out.println("Item cannot be added; maximum number exceeded.");
+        } else if (existItemById(item.getId())) {
+            item.setQuantity(item.getQuantity() + size <= maxSizeMachine ? item.getQuantity() : maxSizeMachine - size);
+            items.add(item);
+        } else {
+            Item i = getItemById(item.getId());
+            item.setQuantity(i.getQuantity() + item.getQuantity() <= maxSizeMachine ? item.getQuantity() : maxSizeMachine - size);
+            i.setQuantity(i.getQuantity() + item.getQuantity());
+        }
+    }
+
+    public boolean checkQuantityToRemove(Item item, int quantity) {
+        if (item.getQuantity() > quantity) {
+            System.out.println("This item is available.");
+            return true;
+        } else {
+            System.out.println("This item has " + item.getQuantity() + " times.");
+            return false;
+        }
     }
 
     public void addItem(Item item) {
-        int cnt;
         if (items.isEmpty()) {
+            item.setQuantity(Math.min(item.getQuantity(), maxSizeMachine)); // Ensure no exceeded machine size
             items.add(item);
-            cnt = item.getQuantity();
         } else {
-            int size = 0;
-            for (Item i : items)
-                size += i.getQuantity();
-
-            if (size == maxSizeMachine) {
-                System.out.println("Item cannot be added; maximum number exceeded.");
-                return;
-            } else if (!existItemById(item.getId())) {
-                item.setQuantity(item.getQuantity() + size <= maxSizeMachine ? item.getQuantity() : maxSizeMachine - size);
-                cnt = item.getQuantity();
-                items.add(item);
-            } else {
-                Item i = getItemById(item.getId());
-                i.setQuantity(i.getQuantity() + item.getQuantity() <= maxSizeMachine ? i.getQuantity() + item.getQuantity() : maxSizeMachine - size);
-                cnt = i.getQuantity();
-            }
+            checkQuantityAddition(item);
         }
+        int cnt = item.getQuantity();
         System.out.printf("Added %d %s item.\n", cnt, item.getName());
     }
 
@@ -79,49 +93,54 @@ public class VendingMachine {
         }
     }
 
-    public String showItemsInMachine() {
+    public void showItemsInMachine() {
         if (items.isEmpty()) {
             System.out.println("No items added yet.");
-            return null;
+        } else {
+            StringBuilder allItems = new StringBuilder();
+            allItems.append(String.format("\n%-3s | %-10s | %-7s | %-7s", "ID", "Name", "Price", "Quantity"));
+            allItems.append("\n--------------------------------------");
+            for (Item item : items) {
+                allItems.append(String.format("\n%-3d | %-10s | %-7.2f | %-7d", item.getId(), item.getName(), item.getPrice(), item.getQuantity()));
+            }
+            System.out.println(allItems);
         }
-        StringBuilder allItems = new StringBuilder();
-        allItems.append(String.format("\n%-3s | %-10s | %-7s | %-7s", "ID", "Name", "Price", "Quantity"));
-        allItems.append("\n--------------------------------------");
-        for (Item item : items) {
-            allItems.append(String.format("\n%-3d | %-10s | %-7.2f | %-7d", item.getId(), item.getName(), item.getPrice(), item.getQuantity()));
-        }
-        return allItems.toString();
     }
 
     public void showMoneysInMachine() {
         double total = 0;
         StringBuilder allMoneys = new StringBuilder();
 
-        allMoneys.append(String.format("\n%-10s | %-7s", "Amount", "Count"));
+        allMoneys.append(String.format("\n%-10s | %-5s", "Amount", "Count"));
         allMoneys.append("\n-------------------");
         for (Map.Entry<Double, Integer> m : moneys.entrySet()) {
-            allMoneys.append(String.format("\n%-2.2f JD       | %-7d", m.getKey(), m.getValue()));
+            allMoneys.append(String.format("\n%05.2f JD   | %-7d", m.getKey(), m.getValue()));
             total += m.getKey() * m.getValue();
         }
-        allMoneys.append("\n___________________");
+        allMoneys.append("\n__________________");
         allMoneys.append(String.format("\nTotal: %-10.2f\n", total));
         System.out.println(allMoneys);
     }
 
     public void fillingMachine() {
-        System.out.print("Enter the amount to fill: ");
-        double amount = scanner.nextDouble();
+        char finish;
+        do {
+            System.out.print("Enter the amount to fill: ");
+            double amount = scanner.nextDouble();
 
-        if (!moneys.containsKey(amount)) {
-            System.out.println("Invalid denomination.");
-            return;
-        }
+            if (!moneys.containsKey(amount)) {
+                System.out.println("Invalid denomination.");
+            } else {
+                System.out.print("Enter the count: ");
+                int count = scanner.nextInt();
+                moneys.put(amount, moneys.get(amount) + count);
+                System.out.printf("Added %d units of %.2f JD to the machine.\n", count, amount);
+            }
 
-        System.out.print("Enter the count: ");
-        int count = scanner.nextInt();
+            System.out.print("\nDo you want to complete the purchase? (Yes/No): ");
+            finish = Character.toUpperCase(scanner.next().charAt(0));
 
-        moneys.put(amount, moneys.get(amount) + count);
-        System.out.printf("Added %d units of %.2f JD to the machine.\n", count, amount);
+        } while (finish == 'Y');
     }
 
     public void buyItem() {
@@ -131,91 +150,43 @@ public class VendingMachine {
             return;
         }
         do {
-            boolean remove = true;
+            boolean remove;
             double price;
-            System.out.println(showItemsInMachine());
+
+            showItemsInMachine();
+
             System.out.print("Enter the item ID you want to buy: ");
             int id = scanner.nextInt();
+            if (existItemById(id)) {
+                System.out.printf("Item not found with ID %d.\n", id);
+                System.out.print("\nDo you want to complete the purchase? (Yes/No): ");
+                finish = Character.toUpperCase(scanner.next().charAt(0));
+                continue;
+            }
 
             System.out.print("How many do you want: ");
             int quantity = scanner.nextInt();
+
             Item item = getItemById(id);
 
-            if (item.getQuantity() == quantity) {
-                System.out.println("This item is available.");
-            } else if (item.getQuantity() < quantity) {
-                System.out.println("This item has " + item.getQuantity() + " times.");
-                quantity = item.getQuantity();
-            } else {
-                System.out.println("This item is available.");
-                remove = false;
-            }
+            remove = checkQuantityToRemove(item, quantity);
 
             price = item.getPrice() * quantity;
 
-            if (cashPayment(price)) {
-                if (remove) {
+
+            TreeMap<Double, Integer> tempMoneys = new TreeMap<>(moneys);
+            if (Payment.cash(price, moneys)) {
+                if (!remove) {
                     removeItem(id);
                 } else {
                     item.setQuantity(item.getQuantity() - quantity);
                 }
-            }
-
-            System.out.print("\nDo you want to complete the purchase? (Yes/No):");
-            finish = Character.toUpperCase(scanner.next().charAt(0));
-        } while (finish != 'Y');
-    }
-
-    public boolean cashPayment(double price) {
-        double total = 0;
-        for (Map.Entry<Double, Integer> m : moneys.entrySet()) {
-            total += m.getKey() * m.getValue();
-        }
-
-        double remain;
-        System.out.print("Required amount " + price + " JD: ");
-        double cash = scanner.nextDouble();
-
-        while (cash < price) {
-            System.out.print("Remaining amount" + (price - cash) + "JD, Amount paid " + cash + " JD: ");
-            cash += scanner.nextDouble();
-        }
-
-        if (total < cash) {
-            System.out.println("Sorry, there is no money in the machine.");
-            return false;
-        }
-
-        if (cash == price) {
-            System.out.println("Payment has been made successfully(:");
-            return true;
-        } else {
-            remain = cash - price;
-            double req = 0;
-            for (Map.Entry<Double, Integer> m : moneys.descendingMap().entrySet()) {
-                do {
-                    if (req != remain && m.getValue() >= 1) {
-                        if (req + m.getKey() > remain) {
-                            break;
-                        } else {
-                            req += m.getKey();
-                            moneys.put(m.getKey(), moneys.get(m.getKey()) - 1);
-                        }
-                    } else {
-                        break;
-                    }
-                } while (true);
-                if (req == remain)
-                    break;
-            }
-            if (req != remain) {
-                System.out.println("Sorry, there is no money in the machine.");
-                return false;
             } else {
-                System.out.println("The rest of the amount " + remain + " JD, Thank you for purchasing (:");
-                return true;
+                moneys = tempMoneys;
             }
-        }
 
+            System.out.print("\nDo you want to complete the purchase? (Yes/No): ");
+            finish = Character.toUpperCase(scanner.next().charAt(0));
+        } while (finish == 'Y');
     }
 }
